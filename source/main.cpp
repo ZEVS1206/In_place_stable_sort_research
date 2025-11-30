@@ -6,69 +6,171 @@
 
 #include "logsort.h"
 
-static double now_sec(void) 
+typedef struct 
 {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
-        return 0.0;
-    }
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
+    int key;
+    int original_index;
+} Item;
+
+int cmp_item(const void *pa, const void *pb) 
+{
+    Item a = *(const Item *)pa;
+    Item b = *(const Item *)pb;
+    if (a.key < b.key) return -1;
+    if (a.key > b.key) return +1;
+    return 0;
 }
 
-#define TIMER_START()  double _timer_start = now_sec()
-#define TIMER_ELAPSED() (now_sec() - _timer_start)
-
-
-static void fill_random(int *a, size_t size, int max_key) 
+int cmp_item_stable(const void *pa, const void *pb) 
 {
-    for (size_t index = 0; index < size; index++) 
+    Item a = *(const Item *)pa;
+    Item b = *(const Item *)pb;
+    if (a.key < b.key) return -1;
+    if (a.key > b.key) return +1;
+    if (a.original_index < b.original_index) return -1;
+    if (a.original_index > b.original_index) return +1;
+    return 0;
+}
+
+void copy_array(Item *dst, const Item *src, size_t n) 
+{
+    memcpy(dst, src, n * sizeof(Item));
+}
+
+int is_sorted_and_stable(const Item *a, size_t n) 
+{
+    for (size_t i = 1; i < n; i++) 
     {
-        a[index] = rand() % max_key;
+        if (a[i-1].key > a[i].key) 
+        {
+            return 0;
+        }
+        if (a[i-1].key == a[i].key) 
+        {
+            if (a[i-1].original_index > a[i].original_index) 
+            {
+                return 0;
+            }
+        }
     }
-    return;
+    return 1;
 }
 
-int cmp(const void *pa, const void *pb)
-{
-    int a = *(const int *)pa;
-    int b = *(const int *)pb;
-    return a > b;
-}
-
-void test_random(size_t size, int max_elem)
-{
-    int *array = (int *) calloc(size, sizeof(int));
-    if (array == NULL)
-    {
-        fprintf(stderr, "Error of getting memory for array\n");
-        return;
+void fill_random(Item *a, size_t n, int max_key) {
+    for (size_t i = 0; i < n; i++) {
+        a[i].key = rand() % max_key;
+        a[i].original_index = (int)i;
     }
-    fill_random(array, size, max_elem);
-
-    TIMER_START();
-
-    logsort(array, size, sizeof(int), cmp);
-
-    double elapsed = TIMER_ELAPSED();
-    printf("Elapsed: %.6f sec\n", elapsed);
-    free(array);
-    return;
 }
 
+void test_random(size_t n, int max_key) {
+    Item *a = (Item *) calloc(n, sizeof(Item));
+    Item *b = (Item *) calloc(n, sizeof(Item));
+    if (!a || !b) { perror("malloc"); exit(1); }
 
-int main(void) {
-    srand((unsigned)time(NULL));
-
-    test_random(10, 10);
-    test_random(100, 50);
-    test_random(100, 2000);
-    test_random(1000, 1000);
-    // int array[10] = {1, 8, 7, 6, 6, 3, 4, 6, 1, 2};
-    // logsort(array, 10, sizeof(int), cmp);
-    // for (size_t index = 0; index < 10; ++index)
+    fill_random(a, n, max_key);
+    copy_array(b, a, n);
+    // printf("array_a_before_sort = ");
+    // for (size_t index = 0; index < n; ++index)
     // {
-    //     printf("%d ", array[index]);
+    //     printf("%d ", a[index].key);
     // }
     // printf("\n");
+    
+
+    logsort(a, n, sizeof(Item), cmp_item);
+    qsort(b, n, sizeof(Item), cmp_item);
+    // printf("array_a = ");
+    // for (size_t index = 0; index < n; ++index)
+    // {
+    //     printf("%d ", a[index].key);
+    // }
+    // printf("\narray_b = ");
+    // for (size_t index = 0; index < n; ++index)
+    // {
+    //     printf("%d ", b[index].key);
+    // }
+    // printf("\n\n");
+
+    //check and comparsion with quicksort
+    for (size_t i = 0; i < n; i++) 
+    {
+        if (a[i].key != b[i].key) 
+        {
+            fprintf(stderr, "ERROR: values differ at i=%zu: log=%d, qsort=%d\n", i, a[i].key, b[i].key);
+            exit(1);
+        }
+    }
+
+    //check stable
+    if (!is_sorted_and_stable(a, n)) 
+    {
+        fprintf(stderr, "ERROR: not stable or not sorted for n=%zu\n", n);
+        exit(1);
+    }
+
+    free(a);
+    free(b);
+}
+
+// Test: with repeated keys
+void test_sorted(size_t n) 
+{
+    Item *a = (Item *) calloc(n, sizeof(Item));
+    for (size_t i = 0; i < n; i++) 
+    {
+        a[i].key = (int)(i / 5);
+        a[i].original_index = (int)i;
+    }
+    logsort(a, n, sizeof(Item), cmp_item);
+
+    if (!is_sorted_and_stable(a, n)) 
+    {
+        fprintf(stderr, "ERROR: sorted input – failed stability for n=%zu\n", n);
+        exit(1);
+    }
+    free(a);
+}
+
+// Test: reverse case
+void test_reversed(size_t n) 
+{
+    Item *a = (Item *) calloc(n, sizeof(Item));
+    for (size_t i = 0; i < n; i++) 
+    {
+        a[i].key = (int)(n - i);  
+        a[i].original_index = (int)i;
+    }
+    logsort(a, n, sizeof(Item), cmp_item);
+
+    if (!is_sorted_and_stable(a, n)) 
+    {
+        fprintf(stderr, "ERROR: reversed input – failed for n=%zu\n", n);
+        exit(1);
+    }
+    free(a);
+}
+
+int main(void) 
+{
+    srand((unsigned)time(NULL));
+
+    printf("Testing Logsort...\n");
+
+    test_random(0, 10);
+    test_random(1, 10);
+    test_random(10, 5);
+    test_random(50, 50);
+    test_random(1000, 200);
+    test_random(5000, 1000);
+    printf("Random tests passed\n");
+
+    test_sorted(1000);
+    printf("Already sorted test passed\n");
+
+    test_reversed(1000);
+    printf("Reversed-order test passed\n");
+
+    printf("All tests passed ✅\n");
     return 0;
 }
