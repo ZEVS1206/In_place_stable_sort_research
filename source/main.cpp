@@ -6,6 +6,19 @@
 
 #include "logsort.h"
 
+static double now_sec(void) 
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0.0;
+    }
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+double _timer_start = 0;
+
+#define TIMER_START()  _timer_start = now_sec()
+#define TIMER_ELAPSED() (now_sec() - _timer_start)
+
 typedef struct 
 {
     int key;
@@ -32,12 +45,12 @@ int cmp_item_stable(const void *pa, const void *pb)
     return 0;
 }
 
-void copy_array(Item *dst, const Item *src, size_t n) 
+static void copy_array(Item *dst, const Item *src, size_t n) 
 {
     memcpy(dst, src, n * sizeof(Item));
 }
 
-int is_sorted_and_stable(const Item *a, size_t n) 
+static int is_sorted_and_stable(const Item *a, size_t n) 
 {
     for (size_t i = 1; i < n; i++) 
     {
@@ -56,14 +69,16 @@ int is_sorted_and_stable(const Item *a, size_t n)
     return 1;
 }
 
-void fill_random(Item *a, size_t n, int max_key) {
+static void fill_random(Item *a, size_t n, int max_key) 
+{
     for (size_t i = 0; i < n; i++) {
         a[i].key = rand() % max_key;
         a[i].original_index = (int)i;
     }
 }
 
-void test_random(size_t n, int max_key) {
+static void test_random(size_t n, int max_key) 
+{
     Item *a = (Item *) calloc(n, sizeof(Item));
     Item *b = (Item *) calloc(n, sizeof(Item));
     if (!a || !b) { perror("malloc"); exit(1); }
@@ -76,10 +91,16 @@ void test_random(size_t n, int max_key) {
     //     printf("%d ", a[index].key);
     // }
     // printf("\n");
-    
-
+    printf("size = %lu\n", n);
+    TIMER_START();
     logsort(a, n, sizeof(Item), cmp_item);
+    double time_of_sort = TIMER_ELAPSED();
+    printf("\x1b[33mLogsort:\x1b[0m %.6f sec\n", time_of_sort);
+
+    TIMER_START();
     qsort(b, n, sizeof(Item), cmp_item);
+    time_of_sort = TIMER_ELAPSED();
+    printf("\x1b[32mQuicksort:\x1b[0m %.6f sec\n", time_of_sort);
     // printf("array_a = ");
     // for (size_t index = 0; index < n; ++index)
     // {
@@ -114,7 +135,7 @@ void test_random(size_t n, int max_key) {
 }
 
 // Test: with repeated keys
-void test_sorted(size_t n) 
+static void test_sorted(size_t n) 
 {
     Item *a = (Item *) calloc(n, sizeof(Item));
     for (size_t i = 0; i < n; i++) 
@@ -133,7 +154,7 @@ void test_sorted(size_t n)
 }
 
 // Test: reverse case
-void test_reversed(size_t n) 
+static void test_reversed(size_t n) 
 {
     Item *a = (Item *) calloc(n, sizeof(Item));
     for (size_t i = 0; i < n; i++) 
@@ -159,10 +180,13 @@ int main(void)
 
     test_random(0, 10);
     test_random(1, 10);
+    test_random(5, 10);
+    test_random(6, 10);
     test_random(10, 5);
     test_random(50, 50);
     test_random(1000, 200);
     test_random(5000, 1000);
+    test_random(10000, 1000);
     printf("Random tests passed\n");
 
     test_sorted(1000);

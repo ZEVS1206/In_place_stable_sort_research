@@ -92,7 +92,8 @@ void *select_pivot(void *array, size_t size_of_array, size_t size_of_element, cm
     char *A = (char *)array;
     
     // For small arrays, just use the middle element
-    if (size_of_array <= 5) {
+    if (size_of_array <= 5) 
+    {
         return A + (size_of_array / 2) * size_of_element;
     }
     
