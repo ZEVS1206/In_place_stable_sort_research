@@ -4,183 +4,296 @@
 
 #include "logsort.h"
 
-void intersection_sort(char *array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp)
+#define THRESHOLD_INSERTION 32
+#define MERGE_BUFFER_SIZE 256
+
+static void optimized_insertion_sort(char* array, size_t n, size_t elem_size, cmp_func_t cmp) 
 {
-    if (array == NULL)
+    if (n <= 1) 
     {
-        fprintf(stderr, "Error of intersection_sort\n");
         return;
     }
-    for (size_t index = 1; index < size_of_array; ++index)
+    
+    // Для маленьких элементов используем стековый буфер
+    if (elem_size <= MERGE_BUFFER_SIZE) 
     {
-        char *elem = array + index * size_of_element;
-        char *tmp = (char *)calloc(size_of_element, sizeof(char));
-        if (tmp == NULL)
+        char temp[MERGE_BUFFER_SIZE];
+        for (size_t i = 1; i < n; i++) 
         {
-            fprintf(stderr, "Error of intersection_sort\n");
+            char* current = array + i * elem_size;
+            memcpy(temp, current, elem_size);
+            
+            size_t j = i;
+            while (j > 0 && cmp(array + (j-1) * elem_size, temp) > 0) 
+            {
+                memcpy(array + j * elem_size, array + (j-1) * elem_size, elem_size);
+                j--;
+            }
+            
+            if (j != i) 
+            {
+                memcpy(array + j * elem_size, temp, elem_size);
+            }
+        }
+    } 
+    else 
+    {
+        // Для больших элементов выделяем временный буфер
+        char* temp = (char*)calloc(elem_size, sizeof(char));
+        if (!temp) 
+        {
             return;
         }
-        memcpy(tmp, elem, size_of_element);
-
-        size_t index_for_search = index;
-        while (index_for_search > 0 && cmp(array + (index_for_search - 1) * size_of_element, tmp) > 0)
+        
+        for (size_t i = 1; i < n; i++) 
         {
-            memcpy(array + index_for_search * size_of_element, array + (index_for_search - 1) * size_of_element, size_of_element);
-            index_for_search--;
+            char* current = array + i * elem_size;
+            memcpy(temp, current, elem_size);
+            
+            size_t j = i;
+            while (j > 0 && cmp(array + (j-1) * elem_size, temp) > 0) 
+            {
+                memcpy(array + j * elem_size, array + (j-1) * elem_size, elem_size);
+                j--;
+            }
+            
+            if (j != i) 
+            {
+                memcpy(array + j * elem_size, temp, elem_size);
+            }
         }
-        memcpy(array + index_for_search * size_of_element, tmp, size_of_element);
-        free(tmp);
+        free(temp);
     }
 }
 
-// Improved stable partition that properly handles equal elements
-size_t stable_partition(void *array, size_t size_of_array, size_t size_of_element, void *pivot, cmp_func_t cmp, void *buffer)
+void intersection_sort(char* array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp) 
 {
-    if (array == NULL || buffer == NULL || pivot == NULL)
+    optimized_insertion_sort(array, size_of_array, size_of_element, cmp);
+}
+
+size_t stable_partition(void* array, size_t n, size_t elem_size, 
+                       void* pivot, cmp_func_t cmp, void* buffer) 
+{
+    char* src = (char*)array;
+    char* dst = (char*)buffer;
+    
+    size_t less_cnt = 0, equal_cnt = 0;
+    
+    // Подсчет элементов
+    for (size_t i = 0; i < n; i++) 
     {
-        fprintf(stderr, "Error in stable_partition\n");
-        return 0;
-    }
-    
-    char *A = (char *)array;
-    char *B = (char *)buffer;
-    
-    // Count elements in each category
-    size_t less_count = 0;
-    size_t equal_count = 0;
-    
-    for (size_t i = 0; i < size_of_array; ++i)
-    {
-        int cmp_result = cmp(A + i * size_of_element, pivot);
-        if (cmp_result < 0) {
-            less_count++;
-        } else if (cmp_result == 0) {
-            equal_count++;
+        int res = cmp(src + i * elem_size, pivot);
+        if (res < 0) 
+        {
+            less_cnt++;
+        } 
+        else if (res == 0) 
+        {
+            equal_cnt++;
         }
     }
     
-    // Copy elements to buffer in stable order
     size_t less_idx = 0;
-    size_t equal_idx = less_count;
-    size_t greater_idx = less_count + equal_count;
+    size_t equal_idx = less_cnt;
+    size_t greater_idx = less_cnt + equal_cnt;
     
-    for (size_t i = 0; i < size_of_array; ++i)
+    // Распределение элементов
+    for (size_t i = 0; i < n; i++) 
     {
-        char *current = A + i * size_of_element;
-        int cmp_result = cmp(current, pivot);
+        char* elem = src + i * elem_size;
+        int res = cmp(elem, pivot);
         
-        if (cmp_result < 0) {
-            memcpy(B + less_idx * size_of_element, current, size_of_element);
+        if (res < 0) 
+        {
+            memcpy(dst + less_idx * elem_size, elem, elem_size);
             less_idx++;
-        } else if (cmp_result == 0) {
-            memcpy(B + equal_idx * size_of_element, current, size_of_element);
+        } 
+        else if (res == 0) 
+        {
+            memcpy(dst + equal_idx * elem_size, elem, elem_size);
             equal_idx++;
-        } else {
-            memcpy(B + greater_idx * size_of_element, current, size_of_element);
+        } 
+        else 
+        {
+            memcpy(dst + greater_idx * elem_size, elem, elem_size);
             greater_idx++;
         }
     }
     
-    // Copy back to original array
-    memcpy(A, B, size_of_array * size_of_element);
-    return less_count;
+    memcpy(src, dst, n * elem_size);
+    return less_cnt;
 }
 
-// Simple pivot selection without dynamic memory allocation
-void *select_pivot(void *array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp)
+// Выбор опорного элемента - медиана трех
+static void* select_pivot(void* array, size_t n, size_t elem_size, cmp_func_t cmp) 
 {
-    char *A = (char *)array;
+    char* arr = (char*)array;
     
-    // For small arrays, just use the middle element
-    if (size_of_array <= 5) 
+    if (n <= 3) 
     {
-        return A + (size_of_array / 2) * size_of_element;
+        return arr;
     }
     
-    // Sample 3 elements: first, middle, last
-    char *first = A;
-    char *middle = A + (size_of_array / 2) * size_of_element;
-    char *last = A + (size_of_array - 1) * size_of_element;
+    char* a = arr;
+    char* b = arr + (n / 2) * elem_size;
+    char* c = arr + (n - 1) * elem_size;
     
-    // Find median without dynamic allocation
-    if (cmp(first, middle) < 0) {
-        if (cmp(middle, last) < 0) {
-            return middle;  // first < middle < last
-        } else if (cmp(first, last) < 0) {
-            return last;    // first < last <= middle
-        } else {
-            return first;   // last <= first < middle
-        }
+    if (cmp(a, b) < 0) 
+    {
+        if (cmp(b, c) < 0) return b;
+        if (cmp(a, c) < 0) return c;
+        return a;
     } else {
-        if (cmp(first, last) < 0) {
-            return first;   // middle <= first < last
-        } else if (cmp(middle, last) < 0) {
-            return last;    // middle < last <= first
-        } else {
-            return middle;  // last <= middle <= first
+        if (cmp(a, c) < 0) return a;
+        if (cmp(b, c) < 0) return c;
+        return b;
+    }
+}
+
+#define MAX_STACK_SIZE 128
+typedef struct 
+{
+    void* arr;
+    size_t n;
+} SortFrame;
+
+static void iterative_stable_qsort(void* array, size_t n, size_t elem_size, 
+                                  cmp_func_t cmp, void* buffer)
+{
+    SortFrame stack[MAX_STACK_SIZE];
+    int top = 0;
+    
+    stack[top].arr = array;
+    stack[top].n = n;
+    
+    char* temp_buffer = (char*)buffer;
+    
+    while (top >= 0) 
+    {
+        void* curr_arr = stack[top].arr;
+        size_t curr_n = stack[top].n;
+        top--;
+        
+        if (curr_n <= THRESHOLD_INSERTION) 
+        {
+            optimized_insertion_sort((char*)curr_arr, curr_n, elem_size, cmp);
+            continue;
+        }
+        
+        void* pivot_ptr = select_pivot(curr_arr, curr_n, elem_size, cmp);
+        
+        // Копируем опорный элемент в буфер
+        char* pivot_buf = temp_buffer;
+        memcpy(pivot_buf, pivot_ptr, elem_size);
+        
+        // Остальная часть буфера для разбиения
+        char* partition_buf = temp_buffer + elem_size;
+        
+        size_t left_size = stable_partition(curr_arr, curr_n, elem_size, 
+                                           pivot_buf, cmp, partition_buf);
+        
+        // Пропускаем равные элементы
+        char* curr_char = (char*)curr_arr;
+        size_t equal_cnt = 0;
+        for (size_t i = left_size; i < curr_n; i++) 
+        {
+            if (cmp(curr_char + i * elem_size, pivot_buf) == 0) 
+            {
+                equal_cnt++;
+            } 
+            else 
+            {
+                break;
+            }
+        }
+        
+        size_t right_start = left_size + equal_cnt;
+        size_t right_size = curr_n - right_start;
+        
+        // Обрабатываем больший отрезок первым для минимизации глубины стека
+        if (right_size > left_size) 
+        {
+            if (right_size > 1) 
+            {
+                if (top + 1 < MAX_STACK_SIZE) 
+                {
+                    top++;
+                    stack[top].arr = (char*)curr_arr + right_start * elem_size;
+                    stack[top].n = right_size;
+                }
+            }
+            if (left_size > 1) 
+            {
+                if (top + 1 < MAX_STACK_SIZE) 
+                {
+                    top++;
+                    stack[top].arr = curr_arr;
+                    stack[top].n = left_size;
+                }
+            }
+        } 
+        else 
+        {
+            if (left_size > 1) 
+            {
+                if (top + 1 < MAX_STACK_SIZE) 
+                {
+                    top++;
+                    stack[top].arr = curr_arr;
+                    stack[top].n = left_size;
+                }
+            }
+            if (right_size > 1) 
+            {
+                if (top + 1 < MAX_STACK_SIZE) 
+                {
+                    top++;
+                    stack[top].arr = (char*)curr_arr + right_start * elem_size;
+                    stack[top].n = right_size;
+                }
+            }
         }
     }
 }
 
-void logsort_recursive(void *array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp, void *buffer)
+void logsort_recursive(void* array, size_t size_of_array, size_t size_of_element, 
+                      cmp_func_t cmp, void* buffer) 
 {
-    if (array == NULL || buffer == NULL)
+    if (!array || !buffer || size_of_array <= 1) 
     {
-        fprintf(stderr, "Error in logsort_recursive\n");
         return;
     }
     
-    if (size_of_array <= 16)
+    if (size_of_array <= THRESHOLD_INSERTION) 
     {
-        intersection_sort((char *)array, size_of_array, size_of_element, cmp);
+        optimized_insertion_sort((char*)array, size_of_array, size_of_element, cmp);
         return;
     }
-
-    // Select pivot without dynamic allocation
-    void *pivot_ptr = select_pivot(array, size_of_array, size_of_element, cmp);
-    char *pivot_copy = (char *)calloc(size_of_element, sizeof(char));
-    if (pivot_copy == NULL)
-    {
-        fprintf(stderr, "Memory allocation error in logsort_recursive\n");
-        return;
-    }
-    memcpy(pivot_copy, pivot_ptr, size_of_element);
     
-    size_t count_of_small_blocks = stable_partition(array, size_of_array, size_of_element, pivot_copy, cmp, buffer);
-    free(pivot_copy);
-
-    // Check if partition created empty sections
-    if (count_of_small_blocks == 0 || count_of_small_blocks == size_of_array) {
-        // All elements are equal or partition failed, use insertion sort
-        intersection_sort((char *)array, size_of_array, size_of_element, cmp);
-        return;
-    }
-
-    // Recursively sort both parts
-    logsort_recursive(array, count_of_small_blocks, size_of_element, cmp, buffer);
-    logsort_recursive((char *)array + count_of_small_blocks * size_of_element, 
-                     size_of_array - count_of_small_blocks, size_of_element, cmp, buffer);
+    iterative_stable_qsort(array, size_of_array, size_of_element, cmp, buffer);
 }
 
-void logsort(void *array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp)
+void logsort(void* array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp) 
 {
-    if (array == NULL)
-    {
-        fprintf(stderr, "Error in logsort\n");
-        return;
-    }
-    if (size_of_array <= 1)
+    if (!array || size_of_array <= 1) 
     {
         return;
     }
-
-    void *buffer = calloc(size_of_array, size_of_element);
-    if (buffer == NULL)
+    
+    if (size_of_array <= THRESHOLD_INSERTION) 
     {
-        fprintf(stderr, "Error of getting memory for buffer\n");
+        optimized_insertion_sort((char*)array, size_of_array, size_of_element, cmp);
         return;
     }
-
+    
+    size_t buffer_size = (size_of_array + 1) * size_of_element;
+    void* buffer = calloc(buffer_size, sizeof(void));
+    if (!buffer) 
+    {
+        optimized_insertion_sort((char*)array, size_of_array, size_of_element, cmp);
+        return;
+    }
+    
     logsort_recursive(array, size_of_array, size_of_element, cmp, buffer);
     free(buffer);
 }

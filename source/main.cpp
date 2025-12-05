@@ -6,6 +6,9 @@
 
 #include "logsort.h"
 
+int cmp_item(const void *pa, const void *pb);
+int cmp_item_stable(const void *pa, const void *pb);
+
 static double now_sec(void) 
 {
     struct timespec ts;
