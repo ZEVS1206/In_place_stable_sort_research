@@ -183,13 +183,13 @@ int main(void)
 
     test_random(0, 10);
     test_random(1, 10);
-    test_random(5, 10);
-    test_random(6, 10);
     test_random(10, 5);
-    test_random(50, 50);
+    test_random(50, 500);
     test_random(1000, 200);
     test_random(5000, 1000);
     test_random(10000, 1000);
+    test_random(1000000, 1000);
+    test_random(10000000, 1000);
     printf("Random tests passed\n");
 
     test_sorted(1000);
