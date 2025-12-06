@@ -253,6 +253,22 @@ logsort(arr, n, sizeof(int), cmp_int);
 - **Space Complexity**: O(log n) extra space
 - **Stability**: Yes - preserves relative order of equal elements
 
+## BenchMarks
+
+### Dependence on data density
+
+In fact, any stable speed sorting strongly depends on the density of the data received, that is, on the proportion of unique among all. Thus, time measurements were carried out, depending on the size of the array and the density of the data. Graphs of **target** and **real** density are also provided. The **target** density is the density that we set as ideal for testing, the **real** density is the one that turned out in the end.
+### Performance Charts
+
+#### Target density graph
+![Target density graph](get_statistics/statistics/logsort_vs_qsort_target.png)
+
+#### Real density graph
+![Real density graph](get_statistics/statistics/logsort_vs_qsort_actual.png)
+
+#### Timeline of the lead time relationship
+![Timeline of the lead time relationship](get_statistics/statistics/logsort_vs_qsort_ratio.png)
+
 ## Advantages
 
 - **Optimal Time Complexity**: O(n log n) performance matching the best comparison-based sorts
