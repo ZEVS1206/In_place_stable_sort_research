@@ -14,7 +14,6 @@ static void optimized_insertion_sort(char* array, size_t n, size_t elem_size, cm
         return;
     }
     
-    // Для маленьких элементов используем стековый буфер
     if (elem_size <= MERGE_BUFFER_SIZE) 
     {
         char temp[MERGE_BUFFER_SIZE];
@@ -38,7 +37,6 @@ static void optimized_insertion_sort(char* array, size_t n, size_t elem_size, cm
     } 
     else 
     {
-        // Для больших элементов выделяем временный буфер
         char* temp = (char*)calloc(elem_size, sizeof(char));
         if (!temp) 
         {
@@ -79,7 +77,6 @@ size_t stable_partition(void* array, size_t n, size_t elem_size,
     
     size_t less_cnt = 0, equal_cnt = 0;
     
-    // Подсчет элементов
     for (size_t i = 0; i < n; i++) 
     {
         int res = cmp(src + i * elem_size, pivot);
@@ -97,7 +94,6 @@ size_t stable_partition(void* array, size_t n, size_t elem_size,
     size_t equal_idx = less_cnt;
     size_t greater_idx = less_cnt + equal_cnt;
     
-    // Распределение элементов
     for (size_t i = 0; i < n; i++) 
     {
         char* elem = src + i * elem_size;
@@ -124,7 +120,6 @@ size_t stable_partition(void* array, size_t n, size_t elem_size,
     return less_cnt;
 }
 
-// Выбор опорного элемента - медиана трех
 static void* select_pivot(void* array, size_t n, size_t elem_size, cmp_func_t cmp) 
 {
     char* arr = (char*)array;
@@ -157,7 +152,7 @@ typedef struct
     size_t n;
 } SortFrame;
 
-static void iterative_stable_qsort(void* array, size_t n, size_t elem_size, 
+static void iterative_stable_sort(void* array, size_t n, size_t elem_size, 
                                   cmp_func_t cmp, void* buffer)
 {
     SortFrame stack[MAX_STACK_SIZE];
@@ -182,17 +177,13 @@ static void iterative_stable_qsort(void* array, size_t n, size_t elem_size,
         
         void* pivot_ptr = select_pivot(curr_arr, curr_n, elem_size, cmp);
         
-        // Копируем опорный элемент в буфер
         char* pivot_buf = temp_buffer;
         memcpy(pivot_buf, pivot_ptr, elem_size);
         
-        // Остальная часть буфера для разбиения
         char* partition_buf = temp_buffer + elem_size;
         
         size_t left_size = stable_partition(curr_arr, curr_n, elem_size, 
                                            pivot_buf, cmp, partition_buf);
-        
-        // Пропускаем равные элементы
         char* curr_char = (char*)curr_arr;
         size_t equal_cnt = 0;
         for (size_t i = left_size; i < curr_n; i++) 
@@ -210,7 +201,6 @@ static void iterative_stable_qsort(void* array, size_t n, size_t elem_size,
         size_t right_start = left_size + equal_cnt;
         size_t right_size = curr_n - right_start;
         
-        // Обрабатываем больший отрезок первым для минимизации глубины стека
         if (right_size > left_size) 
         {
             if (right_size > 1) 
@@ -270,7 +260,7 @@ void logsort_recursive(void* array, size_t size_of_array, size_t size_of_element
         return;
     }
     
-    iterative_stable_qsort(array, size_of_array, size_of_element, cmp, buffer);
+    iterative_stable_sort(array, size_of_array, size_of_element, cmp, buffer);
 }
 
 void logsort(void* array, size_t size_of_array, size_t size_of_element, cmp_func_t cmp) 
