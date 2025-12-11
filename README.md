@@ -259,6 +259,11 @@ logsort(arr, n, sizeof(int), cmp_int);
 
 In fact, any stable speed sorting strongly depends on the density of the data received, that is, on the proportion of unique among all. Thus, time measurements were carried out, depending on the size of the array and the density of the data. Graphs of **target** and **real** density are also provided. The **target** density is the density that we set as ideal for testing, the **real** density is the one that turned out in the end.
 ### Performance Charts
+#### Technical Specifications
+- **Compiler**: g++ (GCC, version 14.2.0)
+- **IDE**: Microsoft VSCode
+- **OS**: Kali Linux (version 2025.3)
+- **CPU**: Intel Core i7 13700H (2.4 GHz)
 
 #### Target density graph
 ![Target density graph](get_statistics/statistics/logsort_vs_qsort_target.png)
